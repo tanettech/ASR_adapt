@@ -16,9 +16,7 @@ import psutil
 # export MKL_NUM_THREADS=1
 # export NUMEXPR_NUM_THREADS=1
 
-#interact -p RM-shared --ntasks-per-node=32 -t 06:00:00
-
-
+#interact -p RM-shared --ntasks-per-node=64 -t 08:00:00
 
 def process_manifest_entry(manifest, tar, target_sr=16000, split='train'):
     """Process a single manifest given an already-open tarfile.TarFile object.
@@ -63,15 +61,18 @@ def process_manifest_entry(manifest, tar, target_sr=16000, split='train'):
         return None
 
 
-def process_shard_worker(sid, tar_path, data_dir, split='train', target_sr=16000):
-    """Top-level worker to process a shard. Reads manifest files from disk
-    for the given `split` and processes entries whose `shard_id` == sid.
-    This avoids pickling large manifest lists into the process pool."""
-    results = []
+def process_shard_worker(sid, tar_path, data_dir, split='train', target_sr=16000, batch_dir=None, chunk_size=500):
+    """Process a shard and save in chunks to minimize memory usage.
+    Returns the list of chunk paths saved."""
+    chunk_paths = []
+    chunk = []
+    chunk_idx = 0
+    
     try:
         tar_path = str(tar_path)
         data_dir = Path(data_dir)
         tarred_dir = data_dir / f"{split}_tarred" / "sharded_manifests_with_image"
+        
         # Count expected manifests for logging
         nman = 0
         for mf in sorted(tarred_dir.glob("manifest_*.json")):
@@ -89,6 +90,7 @@ def process_shard_worker(sid, tar_path, data_dir, split='train', target_sr=16000
 
         print(f"Shard {sid} starting: {nman} manifests; tar={tar_path}", flush=True)
         seen = 0
+        
         with tarfile.open(tar_path, 'r:xz') as tar:
             for mf in sorted(tarred_dir.glob("manifest_*.json")):
                 with open(mf, 'r', encoding='utf-8') as f:
@@ -104,6 +106,7 @@ def process_shard_worker(sid, tar_path, data_dir, split='train', target_sr=16000
                             continue
                         if int(manifest['shard_id']) != int(sid):
                             continue
+                        
                         # For test split, accept even if text is null
                         if split != 'test':
                             text_value = manifest.get('text')
@@ -115,26 +118,47 @@ def process_shard_worker(sid, tar_path, data_dir, split='train', target_sr=16000
 
                         r = process_manifest_entry(manifest, tar, target_sr=target_sr, split=split)
                         if r:
-                            results.append(r)
+                            chunk.append(r)
+                        
                         seen += 1
                         if seen % 100 == 0:
                             print(f"Shard {sid}: processed {seen}/{nman}", flush=True)
+                        
+                        # Save chunk when it reaches chunk_size
+                        if len(chunk) >= chunk_size and batch_dir:
+                            chunk_path = Path(batch_dir) / f"shard_{sid}_chunk_{chunk_idx}"
+                            Dataset.from_list(chunk).save_to_disk(str(chunk_path))
+                            chunk_paths.append(chunk_path)
+                            print(f"  → Saved chunk {chunk_idx} ({len(chunk)} samples) to {chunk_path}", flush=True)
+                            chunk = []
+                            chunk_idx += 1
+                            gc.collect()
 
-        print(f"Shard {sid} finished: produced {len(results)} samples", flush=True)
+        # Save remaining samples in chunk
+        if chunk and batch_dir:
+            chunk_path = Path(batch_dir) / f"shard_{sid}_chunk_{chunk_idx}"
+            Dataset.from_list(chunk).save_to_disk(str(chunk_path))
+            chunk_paths.append(chunk_path)
+            print(f"  → Saved final chunk {chunk_idx} ({len(chunk)} samples) to {chunk_path}", flush=True)
+            chunk = []
+            gc.collect()
+
+        print(f"Shard {sid} finished: saved {len(chunk_paths)} chunks", flush=True)
+        
     except Exception as e:
         print(f"Error processing shard {sid} ({tar_path}): {e}")
     
     # Force garbage collection to free memory
     gc.collect()
-    return results
+    return chunk_paths
 
 def process_tarred_to_hf(
     data_dir: Path,
     split: str = 'train',
     target_sr: int = 16000,
     out_dir: Path = None,
-    num_proc: int = 2,
-    batch_size: int = 1000
+    num_proc: int = 1,
+    batch_size: int = 500
 ):
     data_dir = Path(data_dir)
     tarred_dir = data_dir / f"{split}_tarred" / "sharded_manifests_with_image"
@@ -183,122 +207,81 @@ def process_tarred_to_hf(
     batch_dir_base = out_dir / "batches"
     batch_dir_base.mkdir(parents=True, exist_ok=True)
 
-    batch = []
-    batch_count = 0
-    processed = 0
+    # Sequential processing: process each shard in chunks to minimize memory usage
+    print("Processing shards sequentially with chunked saving to minimize memory usage...")
+    all_chunk_paths = []
+    
+    for sid in shard_ids:
+        tar_path = shard_to_tar.get(sid)
+        if not tar_path:
+            print(f"Warning: no tar file for shard {sid}")
+            continue
+        
+        try:
+            # Process shard with chunked saving (saves every 500 samples)
+            chunk_paths = process_shard_worker(
+                sid, 
+                str(tar_path), 
+                str(data_dir), 
+                split, 
+                target_sr=target_sr,
+                batch_dir=str(batch_dir_base),
+                chunk_size=500
+            )
+            
+            if chunk_paths:
+                all_chunk_paths.extend(chunk_paths)
+                print(f"✓ Shard {sid} completed: {len(chunk_paths)} chunks saved")
+            else:
+                print(f"✗ Shard {sid} produced no chunks")
+            
+            # Log memory after each shard
+            mem_info = process.memory_info()
+            print(f"Memory after shard {sid}: {mem_info.rss / 1024**3:.2f} GB\n")
+            
+            # Force garbage collection
+            gc.collect()
+            
+        except Exception as e:
+            print(f"✗ Shard {sid} failed: {e}\n")
 
-    # shard worker moved to module-level `process_shard_worker` to be picklable
-
-    # Submit one task per shard (parallel across shards). Workers will read
-    # their shard manifests from disk to avoid pickling large lists. If the
-    # process pool fails (e.g. workers killed by the system), fall back to
-    # sequential processing so the job can continue.
-    try:
-        with ProcessPoolExecutor(max_workers=num_proc) as executor:
-            futures = {}
-            for sid in shard_ids:
-                tar_path = shard_to_tar.get(sid)
-                if not tar_path:
-                    print(f"Warning: no tar file for shard {sid}")
-                    continue
-                futures[executor.submit(process_shard_worker, sid, str(tar_path), str(data_dir), split, target_sr)] = sid
-
-            # Use a tqdm progress bar in the main process to track samples processed.
-            with tqdm(total=total, desc=f"Processing {split}", unit='samples') as pbar:
-                for future in as_completed(futures):
-                    sid = futures[future]
-                    try:
-                        results = future.result()
-                    except Exception as e:
-                        print(f"Shard {sid} failed: {e}")
-                        results = []
-                    
-                    # Log memory after each shard completes
-                    mem_info = process.memory_info()
-                    print(f"Memory after shard {sid}: {mem_info.rss / 1024**3:.2f} GB")
-                    gc.collect()
-
-                    nnew = 0
-                    for r in results:
-                        batch.append(r)
-                        processed += 1
-                        nnew += 1
-
-                        if len(batch) >= batch_size:
-                            # flush batch to disk
-                            batch_count += 1
-                            batch_out = batch_dir_base / f"batch_{batch_count}"
-                            Dataset.from_list(batch).save_to_disk(str(batch_out))
-                            print(f"Wrote batch {batch_count} ({len(batch)} samples) -> {batch_out}")
-                            batch = []
-
-                    # update progress bar by number of samples returned by this shard
-                    if nnew:
-                        pbar.update(nnew)
-    except Exception as exc:
-        print(f"Parallel processing failed: {exc}. Falling back to sequential processing.")
-        # Sequential fallback with tqdm
-        with tqdm(total=total, desc=f"Processing {split} (sequential)", unit='samples') as pbar:
-            for sid in shard_ids:
-                tar_path = shard_to_tar.get(sid)
-                if not tar_path:
-                    print(f"Warning: no tar file for shard {sid}")
-                    continue
-                try:
-                    results = process_shard_worker(sid, str(tar_path), str(data_dir), split, target_sr=target_sr)
-                except Exception as e:
-                    print(f"Shard {sid} failed in sequential mode: {e}")
-                    results = []
-
-                for r in results:
-                    batch.append(r)
-                    processed += 1
-                    pbar.update(1)
-
-                    if len(batch) >= batch_size:
-                        batch_count += 1
-                        batch_out = batch_dir_base / f"batch_{batch_count}"
-                        Dataset.from_list(batch).save_to_disk(str(batch_out))
-                        print(f"Wrote batch {batch_count} ({len(batch)} samples) -> {batch_out}")
-                        batch = []
-
-    # flush remaining
-    if batch:
-        batch_count += 1
-        batch_out = batch_dir_base / f"batch_{batch_count}"
-        Dataset.from_list(batch).save_to_disk(str(batch_out))
-        print(f"Wrote final batch {batch_count} ({len(batch)} samples) -> {batch_out}")
-
-    # Concatenate batches into final dataset (load each and concat)
-    batch_paths = sorted(batch_dir_base.glob('batch_*'))
-    if not batch_paths:
-        print("No batches written, nothing to save.")
+    # Concatenate all chunks into final dataset
+    print(f"\n{'='*60}")
+    print(f"Concatenating {len(all_chunk_paths)} chunks into final dataset...")
+    print(f"{'='*60}")
+    
+    if not all_chunk_paths:
+        print("No chunks written, nothing to save.")
         return
 
     ds_list = []
-    for p in batch_paths:
+    for i, p in enumerate(all_chunk_paths):
         try:
             ds_list.append(Dataset.load_from_disk(str(p)))
+            if (i + 1) % 10 == 0:
+                print(f"Loaded {i + 1}/{len(all_chunk_paths)} chunks...")
         except Exception as e:
-            print(f"Failed to load batch {p}: {e}")
+            print(f"Failed to load chunk {p}: {e}")
 
     if not ds_list:
-        print("No batches could be loaded; aborting final save.")
+        print("No chunks could be loaded; aborting final save.")
         return
 
+    print(f"Concatenating {len(ds_list)} datasets...")
     if len(ds_list) == 1:
         final_ds = ds_list[0]
     else:
         try:
             final_ds = concatenate_datasets(ds_list)
         except Exception as e:
-            print(f"Concatenation failed: {e}. Saving batches individually.")
-            print(f"Final processed data is available in {batch_dir_base}")
+            print(f"Concatenation failed: {e}. Chunks are available in {batch_dir_base}")
             return
 
     final_out = out_dir / 'final'
+    print(f"Saving final dataset to {final_out}...")
     final_ds.save_to_disk(str(final_out))
     print(f"✅ Processed dataset saved to {final_out}")
+    print(f"✅ Total samples: {len(final_ds)}")
 
 if __name__ == "__main__":
     data_dir = "/ocean/projects/cis250145p/tanghang/ASR_adapt/ASR_adapter/metadata/"
@@ -307,4 +290,4 @@ if __name__ == "__main__":
     print(f"\n{'='*60}")
     print(f"Processing train split...")
     print(f"{'='*60}")
-    process_tarred_to_hf(data_dir, split='train', num_proc=2, batch_size=1000)
+    process_tarred_to_hf(data_dir, split='train', num_proc=1, batch_size=1000)

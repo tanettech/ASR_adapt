@@ -16,7 +16,6 @@ request for gpu on psc
 interact -p GPU-shared --gres=gpu:v100-32:1 -t 04:00:00 -A cis250145p
 interact -p RM-shared --ntasks-per-node=1 --cpus-per-task=32 -t 8:00:00 -A cis250145p
 
-
 '''
 
 os.environ['HF_HOME'] = '/ocean/projects/cis250145p/tanghang/ASR_adapt/hf_cache'

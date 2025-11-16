@@ -39,14 +39,3 @@ REPRODUCTION INSTRUCTIONS:
 5. Run inference using the provided code
 
 OBSERVATIONS:
-[Add your observations about the training process and results]
-"""
-    
-    with open("submission/report.pdf", "w") as f:
-        f.write(report_content)
-    
-    print("✅ Submission package created in 'submission/' directory")
-    print("📋 Please fill in the report template with your information")
-
-# Create submission package
-create_submission_package()

@@ -16,7 +16,7 @@ import psutil
 # export MKL_NUM_THREADS=1
 # export NUMEXPR_NUM_THREADS=1
 
-#interact -p RM-shared --ntasks-per-node=64 -t 08:00:00
+#interact -p RM-shared --ntasks-per-node=64 -t 02:00:00
 
 def process_manifest_entry(manifest, tar, target_sr=16000, split='train'):
     """Process a single manifest given an already-open tarfile.TarFile object.

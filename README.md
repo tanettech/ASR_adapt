@@ -1,7 +1,7 @@
 # ASR_adapt
 
 prepare dataset to be used for fineturning
-ASR Fellowship Challenge Submission Report
+ASR Fellowship Challenge Submission
 
 Name: [Your Name]
 Contact: [Your Email]

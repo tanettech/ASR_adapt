@@ -37,5 +37,3 @@ REPRODUCTION INSTRUCTIONS:
 3. Apply LoRA adapters with the provided configuration
 4. Load adapter weights from 'best_adapter' directory
 5. Run inference using the provided code
-
-OBSERVATIONS:

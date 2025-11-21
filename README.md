@@ -97,3 +97,14 @@ Recognition,” arXiv:2105.11905 (2021).
 
 [4] N. Houlsby et al., “Parameter-Efficient Transfer Learning for NLP,”
 arXiv:1902.00751 (2019).
+
+[5] @misc{thomas2022efficientadaptertransferselfsupervised,
+      title={Efficient Adapter Transfer of Self-Supervised Speech Models for Automatic Speech Recognition}, 
+      author={Bethan Thomas and Samuel Kessler and Salah Karout},
+      year={2022},
+      eprint={2202.03218},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2202.03218}, 
+}
+[6] https://arxiv.org/pdf/2312.05187

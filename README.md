@@ -54,7 +54,7 @@ We evaluated the models on the validation split using Word Error Rate (WER) as t
 
 | Setup | Greedy WER ⬇ | WER + KenLM (2-gram) ⬇ | KenLM Improvement ⬆ |
 |-------|--------------|------------------------|---------------------|
-| **Base Model** | 6.51% | 6.03% | 0.48% |
+| **Base Model** | 6.51% | 6.03% | **0.48%** |
 | **Adapted Model** | **6.45%** | **5.98%** | 0.47% |
 | **Improvement** | **0.06%** | **0.04%** | 0.02% |
 

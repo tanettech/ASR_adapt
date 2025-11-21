@@ -81,10 +81,15 @@ Rune the evaluation cell on the notebook to calcuare the WER and CER of the base
 ## 4. References
 
 [1] Hu, E. J., et al. (2021). "LoRA: Low-Rank Adaptation of Large Language Models." arXiv preprint arXiv:2106.09685.
+
+
 [2] B. Thomas, S. Kessler, and S. Karout, “Efficient Adapter Transfer of
 Self-Supervised Speech Models for Automatic Speech Recognition,”
 arXiv:2202.03218 (2022).
+
 [3] W. Hou et al., “Exploiting Adapters for Cross-lingual Low-resource Speech
 Recognition,” arXiv:2105.11905 (2021).
+
+
 [4] N. Houlsby et al., “Parameter-Efficient Transfer Learning for NLP,”
 arXiv:1902.00751 (2019).

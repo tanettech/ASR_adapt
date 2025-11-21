@@ -29,7 +29,7 @@ We froze the massive 580M parameter encoder of the base model to preserve its fe
 |-----------|-----------------------|-------------|
 | Base Model (Frozen) | 580 M | 0.00% |
 | Adapter Module (Trainable) | 11 M | 100% |
-| **Total** | **591 M** | **1.86%** |
+| **Total** | **591 M** | **1.86%** | 
 
 ### 1.2 Training Strategy
 
@@ -56,7 +56,7 @@ We evaluated the models on the validation split using Word Error Rate (WER) as t
 |-------|--------------|------------------------|---------------------|
 | **Base Model** | 6.51% | 6.03% | 0.48% |
 | **Adapted Model** | **6.45%** | **5.98%** | 0.47% |
-| **Improvement** | **0.06%** | **0.04%** | - |
+| **Improvement** | **0.06%** | **0.04%** | 0.02% |
 
 The reduction in WER validates that the adapters successfully learned domain-specific phonetic patterns of the health dataset without altering the generalized acoustic features of the base model.
 

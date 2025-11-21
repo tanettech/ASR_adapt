@@ -1,4 +1,5 @@
-# Adapter-Based Fine-Tuning for Low-Resource ASR: Domain Adaptation on Kinyarwanda Health Dataset using LoRA
+# Adapter-Based Fine-Tuning for Low-Resource ASR:
+### Domain Adaptation on Kinyarwanda Health Dataset 
 
 **Author**: Elvis Tata Tanghang  
 **Contact**: getson2215@gmail.com  

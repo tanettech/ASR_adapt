@@ -21,7 +21,7 @@ https://huggingface.co/spaces/ElvisTata2024/Kinyarwanda-Health-ASR
 We froze the massive 580M parameter encoder of the base model to preserve its feature extraction capabilities and injected LoRA matrices into the Transformer layers.
 
 
-
+![LoRA Architecture](lora_architecture.png)
 
 - **Target Modules**: All linear layers in the Transformer block:
   - Attention: `linear_q`, `linear_k`, `linear_v`, `linear_out`

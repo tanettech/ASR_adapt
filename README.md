@@ -12,6 +12,8 @@ This project implements an adapter-based fine-tuning strategy applied to the pre
 ## Demo 
 https://huggingface.co/spaces/ElvisTata2024/Kinyarwanda-Health-ASR
 
+Note: The base model checkpoints code note be uploaded to github so I just linked it here https://huggingface.co/badrex/w2v-bert-2.0-kinyarwanda-asr/tree/main
+
 **Key Result**: We improved the Word Error Rate (WER) from **6.51%** (base) to **6.45%** (adapted), demonstrating a **0.06%** improvement while maintaining the model's general robustness.
 
 ## 1. Methodology

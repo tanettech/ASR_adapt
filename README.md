@@ -12,7 +12,7 @@ This project implements an adapter-based fine-tuning strategy applied to the pre
 ## Demo 
 https://huggingface.co/spaces/ElvisTata2024/Kinyarwanda-Health-ASR
 
-**Result**: We improved the Word Error Rate (WER) from **6.51%** (base) to **6.45%** (adapted), demonstrating a **0.06%** improvement while maintaining the model's general robustness.
+**Key Result**: We improved the Word Error Rate (WER) from **6.51%** (base) to **6.45%** (adapted), demonstrating a **0.06%** improvement while maintaining the model's general robustness.
 
 ## 1. Methodology
 

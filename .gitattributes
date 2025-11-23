@@ -1,2 +1,2 @@
-ASR_adapt/*.tar.gz filter=lfs diff=lfs merge=lfs -text
-ASR_adapt/*.zip filter=lfs diff=lfs merge=lfs -text
+*.tar.gz filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
